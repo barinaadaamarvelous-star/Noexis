@@ -33,11 +33,8 @@ export async function GET() {
       const personBelow = users[i + 1]
 
       // 🧠 PRIORITY CONTROL (ONLY 1 MESSAGE PER RUN)
-      let sent = false
-      async function sendOnce(message: string) {
-        if (sent) return
-        sent = true
-        await send(user.id, message)
+      async function sendSafe(message: string) {
+      await send(user.id, message)
       }
 
       // =========================
@@ -55,23 +52,27 @@ export async function GET() {
         const intentDate = new Date()
         intentDate.setHours(Number(h), Number(m), 0)
 
-        const diffMinutes = Math.floor(
-          (intentDate.getTime() - now.getTime()) / 60000
-        )
+        const diffMinutes = Math.round(
+  (intentDate.getTime() - now.getTime()) / 60000
+)
 
-        // ⏰ BEFORE TIME
-        if (diffMinutes === intent.remind_before) {
-          await sendOnce(
-            `In ${intent.remind_before} min: ${intent.behavior} in ${intent.location}`
-          )
-        }
+     // ⏰ BEFORE TIME (±1 minute window)
+if (
+  intent.remind_before !== null &&
+  diffMinutes <= intent.remind_before &&
+  diffMinutes >= intent.remind_before - 1
+) {
+  await sendSafe(
+    `In ${intent.remind_before} min: ${intent.behavior} in ${intent.location}`
+  )
+}
 
-        // 🚀 EXACT TIME
-        if (diffMinutes === 0) {
-          await sendOnce(
-            `Now: ${intent.behavior} in ${intent.location} 🚀`
-          )
-        }
+// 🚀 EXACT TIME (±1 minute window)
+if (diffMinutes <= 0 && diffMinutes >= -1) {
+  await sendSafe(
+    `Now: ${intent.behavior} in ${intent.location} 🚀`
+  )
+}
       }
 
       // =========================
@@ -90,7 +91,7 @@ export async function GET() {
         const hour = now.getHours()
 
         if (hour >= 18) {
-          await sendOnce(
+          await sendSafe(
             `⚠️ Don’t break your ${user.streak}-day streak. Do 1 task now.`
           )
         }
@@ -102,14 +103,14 @@ export async function GET() {
 
       // 🟢 YOU PASSED SOMEONE
       if (oldRank && newRank < oldRank && personBelow) {
-        await sendOnce(
+        await sendSafe(
           `You passed ${personBelow.username} 🎉`
         )
       }
 
       // 🔴 SOMEONE PASSED YOU
       if (oldRank && newRank > oldRank && personAbove) {
-        await sendOnce(
+        await sendSafe(
           `${personAbove.username} just passed you 🚀`
         )
       }
@@ -119,7 +120,7 @@ export async function GET() {
         const diff = personAbove.score - user.score
 
         if (diff > 0 && diff <= 10) {
-          await sendOnce(
+          await sendSafe(
             `You’re ${diff} pts away from beating ${personAbove.username} 👀`
           )
         }

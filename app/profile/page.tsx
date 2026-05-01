@@ -55,7 +55,11 @@ export default function MyProfile() {
       },
       (payload) => {
         console.log("NEW NOTIFICATION:", payload)
-        fetchNotifications((payload.new as { user_id: string }).user_id)
+        const newData = payload.new as any
+
+        if (newData.user_id === userData?.id) {
+        fetchNotifications(newData.user_id)
+     }
       }
     )
     .subscribe()
@@ -185,8 +189,9 @@ useEffect(() => {
   else if (xp >= 150) newLevel = "Focused"
   else if (xp >= 50) newLevel = "Builder"
 
-  if (newLevel !== data.level) {
-  const oldLevel = data.level
+  const lastLevel = localStorage.getItem("lastLevel")
+
+if (newLevel !== data.level && lastLevel !== newLevel) {
 
   await supabase
     .from("users")
@@ -197,27 +202,25 @@ useEffect(() => {
 
   const message = `⚡ ${getIdentityMessage(newLevel)}`
 
-  // ✅ Save notification
+  // ✅ SAVE TO DB
   await supabase.from("notifications").insert({
     user_id: user.id,
     message,
   })
-  const lastLevel = localStorage.getItem("lastLevel")
 
-if (lastLevel === newLevel) return
+  // ✅ REMEMBER LEVEL (PREVENT REPEAT)
+  localStorage.setItem("lastLevel", newLevel)
 
-localStorage.setItem("lastLevel", newLevel)
-if (notifications) {
-  const volume = Number(localStorage.getItem("volume") || 0.25)
-  playSound("pass", volume)
-}
+  // ✅ SOUND
+  if (notifications) {
+    const volume = Number(localStorage.getItem("volume") || 0.25)
+    playSound("pass", volume)
+  }
 
-  // ✅ Push notification
+  // ✅ PUSH
   await fetch("/api/send-notification", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       userId: user.id,
       message,
