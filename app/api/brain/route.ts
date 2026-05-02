@@ -14,7 +14,9 @@ webpush.setVapidDetails(
 
 export async function GET() {
   try {
-    const now = new Date()
+    const now = new Date(
+  new Date().toLocaleString("en-US", { timeZone: "Africa/Lagos" })
+)
 
     // 🔥 GET ALL USERS SORTED BY SCORE
     const { data: users } = await supabase
@@ -33,7 +35,11 @@ export async function GET() {
       const personBelow = users[i + 1]
 
       // 🧠 PRIORITY CONTROL (ONLY 1 MESSAGE PER RUN)
-      async function sendSafe(message: string) {
+      let sent = false
+
+       async function sendSafe(message: string) {
+      if (sent) return
+      sent = true
       await send(user.id, message)
       }
 
@@ -44,10 +50,6 @@ export async function GET() {
         .from("intentions")
         .select("*")
         .eq("user_id", user.id)
-      
-        const now = new Date(
-  new Date().toLocaleString("en-US", { timeZone: "Africa/Lagos" })
-)
 
 for (const intent of intentions || []) {
   if (!intent.time) continue
@@ -56,22 +58,23 @@ for (const intent of intentions || []) {
   const intentDate = new Date(now)
   intentDate.setHours(Number(h), Number(m), 0)
 
-  const diffMinutes = (intentDate.getTime() - now.getTime()) / 60000
+  const diffMinutes = Math.floor(
+  (intentDate.getTime() - now.getTime()) / 60000
+)
 
-  if (
-    diffMinutes <= intent.remind_before &&
-    diffMinutes > intent.remind_before - 1
-  ) {
-    await sendSafe(
-      `In ${intent.remind_before} min: ${intent.behavior} in ${intent.location}`
-    )
-  }
+// ⏰ BEFORE TIME
+if (diffMinutes === intent.remind_before) {
+  await sendSafe(
+    `In ${intent.remind_before} min: ${intent.behavior} in ${intent.location}`
+  )
+}
 
-  if (diffMinutes <= 0 && diffMinutes > -1) {
-    await sendSafe(
-      `Now: ${intent.behavior} in ${intent.location} 🚀`
-    )
-  }
+// 🚀 EXACT TIME
+if (diffMinutes === 0) {
+  await sendSafe(
+    `Now: ${intent.behavior} in ${intent.location} 🚀`
+  )
+}
 }
 
       // =========================
