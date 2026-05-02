@@ -44,36 +44,35 @@ export async function GET() {
         .from("intentions")
         .select("*")
         .eq("user_id", user.id)
-
-      for (const intent of intentions || []) {
-        if (!intent.time) continue
-
-        const [h, m] = intent.time.split(":")
-        const intentDate = new Date()
-        intentDate.setHours(Number(h), Number(m), 0)
-
-        const diffMinutes = Math.round(
-  (intentDate.getTime() - now.getTime()) / 60000
+      
+        const now = new Date(
+  new Date().toLocaleString("en-US", { timeZone: "Africa/Lagos" })
 )
 
-     // ⏰ BEFORE TIME (±1 minute window)
-if (
-  intent.remind_before !== null &&
-  diffMinutes <= intent.remind_before &&
-  diffMinutes >= intent.remind_before - 1
-) {
-  await sendSafe(
-    `In ${intent.remind_before} min: ${intent.behavior} in ${intent.location}`
-  )
-}
+for (const intent of intentions || []) {
+  if (!intent.time) continue
 
-// 🚀 EXACT TIME (±1 minute window)
-if (diffMinutes <= 0 && diffMinutes >= -1) {
-  await sendSafe(
-    `Now: ${intent.behavior} in ${intent.location} 🚀`
-  )
+  const [h, m] = intent.time.split(":")
+  const intentDate = new Date(now)
+  intentDate.setHours(Number(h), Number(m), 0)
+
+  const diffMinutes = (intentDate.getTime() - now.getTime()) / 60000
+
+  if (
+    diffMinutes <= intent.remind_before &&
+    diffMinutes > intent.remind_before - 1
+  ) {
+    await sendSafe(
+      `In ${intent.remind_before} min: ${intent.behavior} in ${intent.location}`
+    )
+  }
+
+  if (diffMinutes <= 0 && diffMinutes > -1) {
+    await sendSafe(
+      `Now: ${intent.behavior} in ${intent.location} 🚀`
+    )
+  }
 }
-      }
 
       // =========================
       // 🔥 2. STREAK WARNING
