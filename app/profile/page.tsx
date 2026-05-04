@@ -191,7 +191,7 @@ useEffect(() => {
 
   const lastLevel = localStorage.getItem("lastLevel")
 
-if (newLevel !== data.level && lastLevel !== newLevel) {
+ if (newLevel !== data.level && lastLevel !== newLevel) {
 
   await supabase
     .from("users")
@@ -202,12 +202,7 @@ if (newLevel !== data.level && lastLevel !== newLevel) {
 
   const message = `⚡ ${getIdentityMessage(newLevel)}`
 
-  // ✅ SAVE TO DB
-  await supabase.from("notifications").insert({
-    user_id: user.id,
-    message,
-  })
-
+  
   // ✅ REMEMBER LEVEL (PREVENT REPEAT)
   localStorage.setItem("lastLevel", newLevel)
 
@@ -275,58 +270,7 @@ if (newLevel !== data.level && lastLevel !== newLevel) {
   console.log("Calculated streak:", currentStreak)
    setStreak(currentStreak)
    // 🧠 STREAK NOTIFICATIONS
-const lastStreak = userData?.streak || 0
-
-// 🟢 milestone (every 3 days)
-if (currentStreak > 0 && currentStreak % 3 === 0 && currentStreak !== lastStreak) {
-  const message = `🔥 ${currentStreak} day streak! Keep going!`
-
-  await supabase.from("notifications").insert({
-    user_id: user.id,
-    message,
-  })
-
-  await fetch("/api/send-notification", {
-    method: "POST",
-    body: JSON.stringify({
-      userId: user.id,
-      message,
-    }),
-  })
-}
-
-// 🟡 encouragement (small boost)
-if (currentStreak > lastStreak && currentStreak < 3) {
-  const message = `Nice! You're on a ${currentStreak} day streak 💪`
-
-  await supabase.from("notifications").insert({
-    user_id: user.id,
-    message,
-  })
-}
-
-// 🔴 warning (if streak might break tomorrow)
-if (currentStreak > 0) {
-  const lastLog = logs?.[0]
-
-  if (lastLog) {
-    const lastDate = new Date(lastLog.completed_at)
-    const today = new Date()
-
-    const diff =
-      (today.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24)
-
-    if (diff >= 1) {
-      const message = `⚠️ Don't break your ${currentStreak} day streak!`
-
-      await supabase.from("notifications").insert({
-        user_id: user.id,
-        message,
-      })
-    }
-  }
- }
-
+   const lastStreak = data.streak || 0
   await supabase
     .from("users")
     .update({ streak: currentStreak })
