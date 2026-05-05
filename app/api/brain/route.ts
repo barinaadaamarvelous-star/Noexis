@@ -35,9 +35,13 @@ export async function GET() {
       const personBelow = users[i + 1]
 
       // 🧠 PRIORITY CONTROL (ONLY 1 MESSAGE PER RUN)
+      let sent = false
+
       async function sendSafe(message: string) {
+      if (sent) return
+      sent = true
       await send(user.id, message)
-     }
+   }
 
       // =========================
       // 🟢 1. INTENTIONS
@@ -46,29 +50,27 @@ export async function GET() {
         .from("intentions")
         .select("*")
         .eq("user_id", user.id)
-         for (const intent of intentions || []) {
+        
+      for (const intent of intentions || []) {
   if (!intent.time) continue
 
   const [h, m] = intent.time.split(":")
   const intentDate = new Date(now)
   intentDate.setHours(Number(h), Number(m), 0, 0)
 
-  const diffMinutes = Math.round(
+  const diffMinutes =
     (intentDate.getTime() - now.getTime()) / 60000
-  )
 
-  // ⏰ REMINDER WINDOW (more forgiving)
   if (
     diffMinutes <= intent.remind_before &&
-    diffMinutes >= intent.remind_before - 2
+    diffMinutes > intent.remind_before - 2
   ) {
     await sendSafe(
       `In ${intent.remind_before} min: ${intent.behavior} in ${intent.location}`
     )
   }
 
-  // 🚀 EXACT TIME WINDOW (±1 min)
-  if (diffMinutes <= 1 && diffMinutes >= -1) {
+  if (diffMinutes <= 0 && diffMinutes > -2) {
     await sendSafe(
       `Now: ${intent.behavior} in ${intent.location} 🚀`
     )
