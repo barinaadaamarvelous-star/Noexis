@@ -12,16 +12,29 @@ webpush.setVapidDetails(
   process.env.VAPID_PRIVATE_KEY!
 )
 
+// 🧠 IDENTITY ENGINE
+function getIdentityMessage(level: string, action: string) {
+  switch (level) {
+    case "Focused":
+      return `🎯 Focused people don't delay. Go ${action} now.`
+    case "Relentless":
+      return `🔥 No excuses. ${action} right now.`
+    case "Discipline Master":
+      return `👑 This is who you are. ${action}.`
+    default:
+      return `Start now: ${action}.`
+  }
+}
+
 export async function GET() {
   try {
     const now = new Date(
-  new Date().toLocaleString("en-US", { timeZone: "Africa/Lagos" })
-)
+      new Date().toLocaleString("en-US", { timeZone: "Africa/Lagos" })
+    )
 
-    // 🔥 GET ALL USERS SORTED BY SCORE
     const { data: users } = await supabase
       .from("users")
-      .select("id, username, score, streak, last_rank")
+      .select("id, username, score, streak, last_rank, level")
       .order("score", { ascending: false })
 
     if (!users) return new Response("No users")
@@ -34,50 +47,65 @@ export async function GET() {
       const personAbove = users[i - 1]
       const personBelow = users[i + 1]
 
-      // 🧠 PRIORITY CONTROL (ONLY 1 MESSAGE PER RUN)
       let sent = false
 
       async function sendSafe(message: string) {
-      if (sent) return
-      sent = true
-      await send(user.id, message)
-   }
+        if (sent) return
+        sent = true
+        await send(user.id, message)
+      }
 
       // =========================
-      // 🟢 1. INTENTIONS
+      // 🟢 1. INTENTIONS (LEVEL 1–3)
       // =========================
       const { data: intentions } = await supabase
         .from("intentions")
         .select("*")
         .eq("user_id", user.id)
-        
+
       for (const intent of intentions || []) {
-  if (!intent.time) continue
+        if (!intent.time) continue
 
-  const [h, m] = intent.time.split(":")
-  const intentDate = new Date(now)
-  intentDate.setHours(Number(h), Number(m), 0, 0)
+        const [h, m] = intent.time.split(":")
+        const intentDate = new Date(now)
+        intentDate.setHours(Number(h), Number(m), 0, 0)
 
-  const diffMinutes =
-    (intentDate.getTime() - now.getTime()) / 60000
+        const diffMinutes =
+          (intentDate.getTime() - now.getTime()) / 60000
 
-  if (
-    diffMinutes <= intent.remind_before &&
-    diffMinutes > intent.remind_before - 2
-  ) {
-    await sendSafe(
-      `In ${intent.remind_before} min: ${intent.behavior} in ${intent.location}`
-    )
-  }
+        // 🟢 LEVEL 1: REMINDER
+        if (
+          diffMinutes <= intent.remind_before &&
+          diffMinutes > intent.remind_before - 2
+        ) {
+          await sendSafe(
+            `In ${intent.remind_before} min: ${intent.behavior} in ${intent.location}`
+          )
+        }
 
-  if (diffMinutes <= 0 && diffMinutes > -2) {
-    await sendSafe(
-      `Now: ${intent.behavior} in ${intent.location} 🚀`
-    )
-  }
-}
+        // 🚀 LEVEL 2: ACTION + IDENTITY
+        if (diffMinutes <= 0 && diffMinutes > -2) {
+          await sendSafe(
+            getIdentityMessage(user.level, intent.behavior)
+          )
+        }
+
+        // 🔥 LEVEL 3: PRESSURE ESCALATION
+        if (diffMinutes <= -5 && diffMinutes > -7) {
+          await sendSafe(
+            `⏳ You said you'd ${intent.behavior}. Don't break this.`
+          )
+        }
+
+        if (diffMinutes <= -10 && diffMinutes > -12) {
+          await sendSafe(
+            `🚨 Still not done: ${intent.behavior}. This is where discipline is built.`
+          )
+        }
+      }
+
       // =========================
-      // 🔥 2. STREAK WARNING
+      // 🔥 2. STREAK PRESSURE (UPGRADED)
       // =========================
       const todayStart = new Date()
       todayStart.setHours(0, 0, 0, 0)
@@ -91,45 +119,51 @@ export async function GET() {
       if ((!logs || logs.length === 0) && user.streak > 0) {
         const hour = now.getHours()
 
-        if (hour >= 18) {
+        if (hour >= 18 && hour < 20) {
           await sendSafe(
-            `⚠️ Don’t break your ${user.streak}-day streak. Do 1 task now.`
+            `⚠️ Don’t break your ${user.streak}-day streak.`
+          )
+        }
+
+        if (hour >= 20) {
+          await sendSafe(
+            `🚨 Your ${user.streak}-day streak is about to die. Act now.`
           )
         }
       }
 
       // =========================
-      // 🏆 3. LEADERBOARD EVENTS
+      // 🏆 3. LEADERBOARD (UPGRADED)
       // =========================
 
-      // 🟢 YOU PASSED SOMEONE
       if (oldRank && newRank < oldRank && personBelow) {
         await sendSafe(
-          `You passed ${personBelow.username} 🎉`
+          `🎉 You passed ${personBelow.username}`
         )
       }
 
-      // 🔴 SOMEONE PASSED YOU
       if (oldRank && newRank > oldRank && personAbove) {
         await sendSafe(
-          `${personAbove.username} just passed you 🚀`
+          `🚀 ${personAbove.username} just passed you`
         )
       }
 
-      // 👀 CLOSE ALERT
       if (personAbove) {
         const diff = personAbove.score - user.score
 
+        if (diff === 1) {
+          await sendSafe(
+            `🔥 You're 1 point away from beating ${personAbove.username}`
+          )
+        }
+
         if (diff > 0 && diff <= 10) {
           await sendSafe(
-            `You’re ${diff} pts away from beating ${personAbove.username} 👀`
+            `👀 ${diff} pts to beat ${personAbove.username}`
           )
         }
       }
 
-      // =========================
-      // 🔄 UPDATE LAST RANK
-      // =========================
       await supabase
         .from("users")
         .update({ last_rank: newRank })
@@ -144,10 +178,9 @@ export async function GET() {
 }
 
 // =========================
-// 🚀 SEND FUNCTION (DB + PUSH + ANTI-SPAM)
+// 🚀 SEND FUNCTION
 // =========================
 async function send(userId: string, message: string) {
-  // 🛑 PREVENT SPAM (60s window)
   const { data: recent } = await supabase
     .from("notifications")
     .select("*")
@@ -157,14 +190,12 @@ async function send(userId: string, message: string) {
 
   if (recent && recent.length > 0) return
 
-  // ✅ SAVE TO DATABASE
   await supabase.from("notifications").insert({
     user_id: userId,
     message,
     created_at: new Date().toISOString(),
   })
 
-  // ✅ SEND PUSH
   const { data: subs } = await supabase
     .from("push_subscriptions")
     .select("*")
@@ -182,7 +213,6 @@ async function send(userId: string, message: string) {
         })
       )
     } catch (err: any) {
-      // 🧹 remove dead subscriptions
       if (err?.statusCode === 410) {
         await supabase
           .from("push_subscriptions")
