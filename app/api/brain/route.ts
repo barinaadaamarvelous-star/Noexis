@@ -47,16 +47,15 @@ export async function GET() {
       const personAbove = users[i - 1]
       const personBelow = users[i + 1]
 
-      let sent = false
+      // 🧠 PRIORITY QUEUE
+      const queue: { message: string; priority: number }[] = []
 
-      async function sendSafe(message: string) {
-        if (sent) return
-        sent = true
-        await send(user.id, message)
+      function enqueue(message: string, priority = 1) {
+        queue.push({ message, priority })
       }
 
       // =========================
-      // 🟢 1. INTENTIONS (LEVEL 1–3)
+      // 🟢 1. INTENTIONS
       // =========================
       const { data: intentions } = await supabase
         .from("intentions")
@@ -73,39 +72,43 @@ export async function GET() {
         const diffMinutes =
           (intentDate.getTime() - now.getTime()) / 60000
 
-        // 🟢 LEVEL 1: REMINDER
+        // ⏰ reminder
         if (
           diffMinutes <= intent.remind_before &&
           diffMinutes > intent.remind_before - 2
         ) {
-          await sendSafe(
-            `In ${intent.remind_before} min: ${intent.behavior} in ${intent.location}`
+          enqueue(
+            `In ${intent.remind_before} min: ${intent.behavior} in ${intent.location}`,
+            3
           )
         }
 
-        // 🚀 LEVEL 2: ACTION + IDENTITY
+        // 🚀 action
         if (diffMinutes <= 0 && diffMinutes > -2) {
-          await sendSafe(
-            getIdentityMessage(user.level, intent.behavior)
+          enqueue(
+            getIdentityMessage(user.level, intent.behavior),
+            4
           )
         }
 
-        // 🔥 LEVEL 3: PRESSURE ESCALATION
+        // 🔥 pressure
         if (diffMinutes <= -5 && diffMinutes > -7) {
-          await sendSafe(
-            `⏳ You said you'd ${intent.behavior}. Don't break this.`
+          enqueue(
+            `⏳ You said you'd ${intent.behavior}. Don't break this.`,
+            5
           )
         }
 
         if (diffMinutes <= -10 && diffMinutes > -12) {
-          await sendSafe(
-            `🚨 Still not done: ${intent.behavior}. This is where discipline is built.`
+          enqueue(
+            `🚨 Still not done: ${intent.behavior}. Discipline is built now.`,
+            5
           )
         }
       }
 
       // =========================
-      // 🔥 2. STREAK PRESSURE (UPGRADED)
+      // 🔥 2. STREAK
       // =========================
       const todayStart = new Date()
       todayStart.setHours(0, 0, 0, 0)
@@ -120,48 +123,74 @@ export async function GET() {
         const hour = now.getHours()
 
         if (hour >= 18 && hour < 20) {
-          await sendSafe(
-            `⚠️ Don’t break your ${user.streak}-day streak.`
+          enqueue(
+            `⚠️ Don’t break your ${user.streak}-day streak.`,
+            4
           )
         }
 
         if (hour >= 20) {
-          await sendSafe(
-            `🚨 Your ${user.streak}-day streak is about to die. Act now.`
+          enqueue(
+            `🚨 Your ${user.streak}-day streak is about to die.`,
+            5
           )
         }
       }
 
       // =========================
-      // 🏆 3. LEADERBOARD (UPGRADED)
+      // 🏆 3. LEADERBOARD
       // =========================
-
       if (oldRank && newRank < oldRank && personBelow) {
-        await sendSafe(
-          `🎉 You passed ${personBelow.username}`
-        )
+        enqueue(`🎉 You passed ${personBelow.username}`, 2)
       }
 
       if (oldRank && newRank > oldRank && personAbove) {
-        await sendSafe(
-          `🚀 ${personAbove.username} just passed you`
-        )
+        enqueue(`🚀 ${personAbove.username} passed you`, 3)
       }
 
       if (personAbove) {
         const diff = personAbove.score - user.score
 
         if (diff === 1) {
-          await sendSafe(
-            `🔥 You're 1 point away from beating ${personAbove.username}`
+          enqueue(
+            `🔥 You're 1 point away from beating ${personAbove.username}`,
+            4
           )
         }
 
         if (diff > 0 && diff <= 10) {
-          await sendSafe(
-            `👀 ${diff} pts to beat ${personAbove.username}`
+          enqueue(
+            `👀 ${diff} pts to beat ${personAbove.username}`,
+            2
           )
         }
+      }
+
+      // =========================
+      // 🎯 ADDICTION LAYER (LIGHT)
+      // =========================
+      const hour = now.getHours()
+
+      if (hour === 9) {
+        enqueue(`🎯 Daily mission: Complete 3 tasks today`, 3)
+      }
+
+      if (personAbove) {
+        enqueue(
+          `⚔️ Rival: ${personAbove.username}. Beat them today.`,
+          2
+        )
+      }
+
+      // =========================
+      // 🚀 SEND (TOP 3 ONLY)
+      // =========================
+      const top = queue
+        .sort((a, b) => b.priority - a.priority)
+        .slice(0, 3)
+
+      for (const item of top) {
+        await send(user.id, item.message)
       }
 
       await supabase
