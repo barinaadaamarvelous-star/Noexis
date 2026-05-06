@@ -47,15 +47,18 @@ export async function GET() {
       const personAbove = users[i - 1]
       const personBelow = users[i + 1]
 
-      // 🧠 PRIORITY QUEUE
+      // 🧠 QUEUE + DEDUP
       const queue: { message: string; priority: number }[] = []
+      const added = new Set()
 
       function enqueue(message: string, priority = 1) {
+        if (added.has(message)) return
+        added.add(message)
         queue.push({ message, priority })
       }
 
       // =========================
-      // 🟢 1. INTENTIONS
+      // 🟢 1. INTENTIONS (HIGH PRIORITY)
       // =========================
       const { data: intentions } = await supabase
         .from("intentions")
@@ -79,7 +82,7 @@ export async function GET() {
         ) {
           enqueue(
             `In ${intent.remind_before} min: ${intent.behavior} in ${intent.location}`,
-            3
+            10 // 🔥 highest priority
           )
         }
 
@@ -87,7 +90,7 @@ export async function GET() {
         if (diffMinutes <= 0 && diffMinutes > -2) {
           enqueue(
             getIdentityMessage(user.level, intent.behavior),
-            4
+            10
           )
         }
 
@@ -95,14 +98,14 @@ export async function GET() {
         if (diffMinutes <= -5 && diffMinutes > -7) {
           enqueue(
             `⏳ You said you'd ${intent.behavior}. Don't break this.`,
-            5
+            9
           )
         }
 
         if (diffMinutes <= -10 && diffMinutes > -12) {
           enqueue(
             `🚨 Still not done: ${intent.behavior}. Discipline is built now.`,
-            5
+            9
           )
         }
       }
@@ -123,29 +126,25 @@ export async function GET() {
         const hour = now.getHours()
 
         if (hour >= 18 && hour < 20) {
-          enqueue(
-            `⚠️ Don’t break your ${user.streak}-day streak.`,
-            4
-          )
+          enqueue(`⚠️ Don’t break your ${user.streak}-day streak.`, 7)
         }
 
         if (hour >= 20) {
-          enqueue(
-            `🚨 Your ${user.streak}-day streak is about to die.`,
-            5
-          )
+          enqueue(`🚨 Your ${user.streak}-day streak is about to die.`, 8)
         }
       }
 
       // =========================
-      // 🏆 3. LEADERBOARD
+      // 🏆 3. LEADERBOARD (ONLY ON CHANGE)
       // =========================
-      if (oldRank && newRank < oldRank && personBelow) {
-        enqueue(`🎉 You passed ${personBelow.username}`, 2)
-      }
+      if (oldRank && newRank !== oldRank) {
+        if (newRank < oldRank && personBelow) {
+          enqueue(`🎉 You passed ${personBelow.username}`, 6)
+        }
 
-      if (oldRank && newRank > oldRank && personAbove) {
-        enqueue(`🚀 ${personAbove.username} passed you`, 3)
+        if (newRank > oldRank && personAbove) {
+          enqueue(`🚀 ${personAbove.username} passed you`, 6)
+        }
       }
 
       if (personAbove) {
@@ -154,36 +153,36 @@ export async function GET() {
         if (diff === 1) {
           enqueue(
             `🔥 You're 1 point away from beating ${personAbove.username}`,
-            4
+            7
           )
         }
 
         if (diff > 0 && diff <= 10) {
           enqueue(
             `👀 ${diff} pts to beat ${personAbove.username}`,
-            2
+            5
           )
         }
       }
 
       // =========================
-      // 🎯 ADDICTION LAYER (LIGHT)
+      // 🎯 ADDICTION LAYER
       // =========================
       const hour = now.getHours()
 
       if (hour === 9) {
-        enqueue(`🎯 Daily mission: Complete 3 tasks today`, 3)
+        enqueue(`🎯 Daily mission: Complete 3 tasks today`, 6)
       }
 
       if (personAbove) {
         enqueue(
           `⚔️ Rival: ${personAbove.username}. Beat them today.`,
-          2
+          4
         )
       }
 
       // =========================
-      // 🚀 SEND (TOP 3 ONLY)
+      // 🚀 SEND TOP 3
       // =========================
       const top = queue
         .sort((a, b) => b.priority - a.priority)
@@ -207,7 +206,7 @@ export async function GET() {
 }
 
 // =========================
-// 🚀 SEND FUNCTION
+// 🚀 SEND FUNCTION (ANTI-SPAM FIXED)
 // =========================
 async function send(userId: string, message: string) {
   const { data: recent } = await supabase
@@ -215,7 +214,10 @@ async function send(userId: string, message: string) {
     .select("*")
     .eq("user_id", userId)
     .eq("message", message)
-    .gte("created_at", new Date(Date.now() - 60000).toISOString())
+    .gte(
+      "created_at",
+      new Date(Date.now() - 1000 * 60 * 10).toISOString() // 🔥 10 min window
+    )
 
   if (recent && recent.length > 0) return
 
