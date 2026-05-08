@@ -69,12 +69,30 @@ export async function GET() {
         if (!intent.time) continue
 
         const [h, m] = intent.time.split(":")
-        const intentDate = new Date(now)
-        intentDate.setHours(Number(h), Number(m), 0, 0)
 
-        const diffMinutes =
-          (intentDate.getTime() - now.getTime()) / 60000
+const intentDate = new Date(
+  new Date().toLocaleString("en-US", {
+    timeZone: "Africa/Lagos",
+  })
+)
 
+intentDate.setHours(Number(h), Number(m), 0, 0)
+
+const diffMinutes =
+  (intentDate.getTime() - now.getTime()) / 60000
+
+console.log(
+  "🧠 INTENT:",
+  intent.behavior,
+  "TIME:",
+  intent.time,
+  "NOW:",
+  now.toLocaleTimeString(),
+  "INTENT DATE:",
+  intentDate.toLocaleTimeString(),
+  "DIFF:",
+  diffMinutes
+)
         // ⏰ reminder
          // 🧠 DEBUG
 console.log(
