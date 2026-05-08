@@ -135,35 +135,34 @@ export async function GET() {
       }
 
       // =========================
-      // 🏆 3. LEADERBOARD (ONLY ON CHANGE)
-      // =========================
-      if (oldRank && newRank !== oldRank) {
-        if (newRank < oldRank && personBelow) {
-          enqueue(`🎉 You passed ${personBelow.username}`, 6)
-        }
+// 🏆 3. LEADERBOARD (FIXED)
+// =========================
+if (oldRank && newRank < oldRank && personBelow) {
+  enqueue(`🎉 You passed ${personBelow.username}`, 6)
+}
 
-        if (newRank > oldRank && personAbove) {
-          enqueue(`🚀 ${personAbove.username} passed you`, 6)
-        }
-      }
+if (oldRank && newRank > oldRank && personAbove) {
+  enqueue(`🚀 ${personAbove.username} passed you`, 6)
+}
 
-      if (personAbove) {
-        const diff = personAbove.score - user.score
+// only show close alert if NOT changing ranks
+if (oldRank === newRank && personAbove) {
+  const diff = personAbove.score - user.score
 
-        if (diff === 1) {
-          enqueue(
-            `🔥 You're 1 point away from beating ${personAbove.username}`,
-            7
-          )
-        }
+  if (diff === 1) {
+    enqueue(
+      `🔥 You're 1 point away from beating ${personAbove.username}`,
+      7
+    )
+  }
 
-        if (diff > 0 && diff <= 10) {
-          enqueue(
-            `👀 ${diff} pts to beat ${personAbove.username}`,
-            5
-          )
-        }
-      }
+  if (diff > 1 && diff <= 10) {
+    enqueue(
+      `👀 ${diff} pts to beat ${personAbove.username}`,
+      5
+    )
+  }
+}
 
       // =========================
       // 🎯 ADDICTION LAYER
