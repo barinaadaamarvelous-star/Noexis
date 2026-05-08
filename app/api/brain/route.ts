@@ -76,24 +76,37 @@ export async function GET() {
           (intentDate.getTime() - now.getTime()) / 60000
 
         // ⏰ reminder
-        if (
-          diffMinutes <= intent.remind_before &&
-          diffMinutes > intent.remind_before - 2
-        ) {
-          enqueue(
-            `In ${intent.remind_before} min: ${intent.behavior} in ${intent.location}`,
-            10 // 🔥 highest priority
-          )
-        }
+         // 🧠 DEBUG
+console.log(
+  "🧠 INTENT CHECK:",
+  intent.behavior,
+  "DIFF:",
+  diffMinutes
+)
 
-        // 🚀 action
-        if (diffMinutes <= 0 && diffMinutes > -2) {
-          enqueue(
-            getIdentityMessage(user.level, intent.behavior),
-            10
-          )
-        }
+// ⏰ reminder (WIDER WINDOW)
+if (
+  diffMinutes <= intent.remind_before &&
+  diffMinutes >= intent.remind_before - 5
+) {
+  enqueue(
+    `In ${intent.remind_before} min: ${intent.behavior} in ${intent.location}`,
+    10
+  )
 
+  console.log("⏰ REMINDER QUEUED")
+}
+
+// 🚀 action (WIDER WINDOW)
+if (diffMinutes <= 0 && diffMinutes >= -5) {
+  enqueue(
+    getIdentityMessage(user.level, intent.behavior),
+    10
+  )
+
+  console.log("🚀 ACTION QUEUED")
+}
+         
         // 🔥 pressure
         if (diffMinutes <= -5 && diffMinutes > -7) {
           enqueue(
@@ -183,6 +196,7 @@ if (oldRank === newRank && personAbove) {
       // =========================
       // 🚀 SEND TOP 3
       // =========================
+      console.log("📬 FINAL QUEUE:", queue)
       const top = queue
         .sort((a, b) => b.priority - a.priority)
         .slice(0, 3)
