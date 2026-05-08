@@ -205,10 +205,9 @@ export async function GET() {
   }
 }
 
-// =========================
-// 🚀 SEND FUNCTION (ANTI-SPAM FIXED)
-// =========================
 async function send(userId: string, message: string) {
+  console.log("🚀 TRYING TO SEND:", message)
+
   const { data: recent } = await supabase
     .from("notifications")
     .select("*")
@@ -216,10 +215,13 @@ async function send(userId: string, message: string) {
     .eq("message", message)
     .gte(
       "created_at",
-      new Date(Date.now() - 1000 * 60 * 10).toISOString() // 🔥 10 min window
+      new Date(Date.now() - 1000 * 60 * 10).toISOString()
     )
 
-  if (recent && recent.length > 0) return
+  if (recent && recent.length > 0) {
+    console.log("🛑 BLOCKED BY ANTISPAM:", message)
+    return
+  }
 
   await supabase.from("notifications").insert({
     user_id: userId,
@@ -227,15 +229,21 @@ async function send(userId: string, message: string) {
     created_at: new Date().toISOString(),
   })
 
+  console.log("✅ SAVED TO DATABASE")
+
   const { data: subs } = await supabase
     .from("push_subscriptions")
     .select("*")
     .eq("user_id", userId)
 
+  console.log("📦 SUBSCRIPTIONS:", subs)
+
   if (!subs) return
 
   for (const sub of subs) {
     try {
+      console.log("📤 SENDING PUSH...")
+
       await webpush.sendNotification(
         sub.subscription,
         JSON.stringify({
@@ -243,7 +251,11 @@ async function send(userId: string, message: string) {
           body: message,
         })
       )
+
+      console.log("✅ PUSH SENT")
     } catch (err: any) {
+      console.error("❌ PUSH ERROR:", err)
+
       if (err?.statusCode === 410) {
         await supabase
           .from("push_subscriptions")
