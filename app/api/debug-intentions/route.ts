@@ -6,7 +6,11 @@ const supabase = createClient(
 )
 
 export async function GET() {
-  const now = new Date()
+  const now = new Date(
+    new Date().toLocaleString("en-US", {
+      timeZone: "Africa/Lagos",
+    })
+  )
 
   const { data: users } = await supabase
     .from("users")
@@ -25,32 +29,43 @@ export async function GET() {
     .eq("user_id", user.id)
 
   const debug = (intentions || []).map((intent) => {
-    if (!intent.time) return { ...intent, error: "No time set" }
+    if (!intent.time) {
+      return {
+        error: "No time set",
+      }
+    }
 
     const [h, m] = intent.time.split(":")
-    const intentDate = new Date()
-    intentDate.setHours(Number(h), Number(m), 0)
 
-    const diffMinutes = Math.round(
-      (intentDate.getTime() - now.getTime()) / 60000
+    const intentDate = new Date(
+      new Date().toLocaleString("en-US", {
+        timeZone: "Africa/Lagos",
+      })
     )
+
+    intentDate.setHours(Number(h), Number(m), 0, 0)
+
+    const diffMinutes =
+      (intentDate.getTime() - now.getTime()) / 60000
 
     return {
       behavior: intent.behavior,
       location: intent.location,
       time: intent.time,
       remind_before: intent.remind_before,
-      now: now.toISOString(),
-      intentTime: intentDate.toISOString(),
+
+      now: now.toLocaleString(),
+      intentTime: intentDate.toLocaleString(),
+
       diffMinutes,
 
       willTriggerBefore:
-        intent.remind_before !== null &&
         diffMinutes <= intent.remind_before &&
-        diffMinutes >= intent.remind_before - 1,
+        diffMinutes >= intent.remind_before - 5,
 
       willTriggerNow:
-        diffMinutes <= 0 && diffMinutes >= -1,
+        diffMinutes <= 0 &&
+        diffMinutes >= -5,
     }
   })
 
