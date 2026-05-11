@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { supabase } from "@/lib/supabaseClient"
 
 type Notification = {
@@ -13,110 +13,105 @@ export default function NotificationBell() {
   const [open, setOpen] = useState(false)
   const [notifications, setNotifications] = useState<Notification[]>([])
 
+  // 🔊 MAIN SOUND
+  const soundRef = useRef<HTMLAudioElement | null>(null)
+
+  // 🏆 LEADERBOARD SOUND
+  const battleSoundRef = useRef<HTMLAudioElement | null>(null)
+
   useEffect(() => {
-    let interval: any
+    fetchNotifications()
 
-    async function start() {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
+    soundRef.current = new Audio(
+      "https://notificationsounds.com/storage/sounds/file-sounds-1151-pristine.mp3"
+    )
 
-      if (!user) return
+    battleSoundRef.current = new Audio(
+      "https://notificationsounds.com/storage/sounds/file-sounds-1101-plucky.mp3"
+    )
 
-      await fetchNotifications(user.id)
+    const channel = supabase
+      .channel("notifications-live")
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "notifications",
+        },
+        (payload: any) => {
+          const newNotification = payload.new
 
-      // 🔥 POLLING FIX
-      interval = setInterval(() => {
-        fetchNotifications(user.id)
-      }, 5000)
-    }
+          setNotifications((prev) => [
+            newNotification,
+            ...prev,
+          ])
 
-    start()
+          // 🔥 PLAY SOUNDS
+          const msg = newNotification.message || ""
+
+          const isBattle =
+            msg.includes("passed") ||
+            msg.includes("beat") ||
+            msg.includes("Rival")
+
+          try {
+            if (isBattle) {
+              battleSoundRef.current?.play()
+            } else {
+              soundRef.current?.play()
+            }
+          } catch (err) {
+            console.log("sound blocked")
+          }
+
+          // 📳 BROWSER POPUP
+          if (Notification.permission === "granted") {
+            new Notification("Noexis ⚡", {
+              body: msg,
+              icon: "/icon-192x192.png",
+            })
+          }
+        }
+      )
+      .subscribe()
 
     return () => {
-      if (interval) clearInterval(interval)
+      supabase.removeChannel(channel)
     }
   }, [])
 
-  async function fetchNotifications(userId: string) {
-  const { data } = await supabase
-    .from("notifications")
-    .select("*")
-    .eq("user_id", userId)
-    .order("created_at", { ascending: false })
-    .limit(20)
+  async function fetchNotifications() {
+    const { data } = await supabase
+      .from("notifications")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(20)
 
-  // 🔥 PLAY SOUND FOR NEW NOTIFICATION
-  if (
-    data &&
-    notifications.length > 0 &&
-    data[0]?.id !== notifications[0]?.id
-  ) {
-    try {
-      const audioCtx = new (window.AudioContext ||
-        (window as any).webkitAudioContext)()
-
-      const oscillator = audioCtx.createOscillator()
-      const gainNode = audioCtx.createGain()
-
-      oscillator.type = "sine"
-      oscillator.frequency.setValueAtTime(
-        880,
-        audioCtx.currentTime
-      )
-
-      gainNode.gain.setValueAtTime(
-        0.1,
-        audioCtx.currentTime
-      )
-
-      gainNode.gain.exponentialRampToValueAtTime(
-        0.0001,
-        audioCtx.currentTime + 0.5
-      )
-
-      oscillator.connect(gainNode)
-      gainNode.connect(audioCtx.destination)
-
-      oscillator.start()
-      oscillator.stop(audioCtx.currentTime + 0.5)
-    } catch (err) {
-      console.log("Sound failed:", err)
-    }
+    setNotifications(data || [])
   }
-
-  setNotifications(data || [])
-}
 
   return (
     <div className="relative">
-
-      {/* 🔔 Bell */}
+      {/* 🔔 BUTTON */}
       <button
         onClick={() => setOpen(!open)}
-        className="relative text-2xl"
+        className="text-xl"
       >
         🔔
-
-        {notifications.length > 0 && (
-          <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full px-1">
-            {notifications.length}
-          </span>
-        )}
       </button>
 
-      {/* 📬 PANEL */}
+      {/* 📬 DROPDOWN */}
       {open && (
-        <div className="absolute right-0 mt-2 w-80 bg-[#1a1a1a] text-white shadow-xl rounded-xl border border-gray-700 z-50">
+        <div className="absolute right-0 mt-2 w-80 bg-white dark:bg-[#1a1a1a] shadow-lg rounded-lg border border-gray-200 dark:border-gray-700 z-50">
 
-          <div className="p-3 font-bold border-b border-gray-700">
+          <div className="p-3 font-bold border-b border-gray-200 dark:border-gray-700">
             Notifications
           </div>
 
-          <div className="max-h-96 overflow-y-auto">
-
+          <div className="max-h-80 overflow-y-auto">
             {notifications.length === 0 && (
-              <p className="p-3 text-gray-400">
+              <p className="p-3 text-sm text-gray-500">
                 No notifications yet
               </p>
             )}
@@ -124,7 +119,7 @@ export default function NotificationBell() {
             {notifications.map((n) => (
               <div
                 key={n.id}
-                className="p-3 border-b border-gray-800 hover:bg-gray-800"
+                className="p-3 text-sm hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer border-b border-gray-100 dark:border-gray-800"
               >
                 {n.message}
               </div>
