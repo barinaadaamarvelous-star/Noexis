@@ -9,7 +9,6 @@ export default function TasksPage() {
 
   const [loading, setLoading] = useState(true)
   const [tasks, setTasks] = useState<any[]>([])
-  const [intentions, setIntentions] = useState<any[]>([])
   const [activeTask, setActiveTask] = useState<any>(null)
   const [seconds, setSeconds] = useState(0)
   const [notifications, setNotifications] = useState(true)
@@ -19,7 +18,6 @@ export default function TasksPage() {
 
   useEffect(() => {
     fetchTasks()
-    fetchIntentions()
   }, [])
 
   // ⏱ TIMER
@@ -32,23 +30,6 @@ export default function TasksPage() {
     }
     return () => clearInterval(interval)
   }, [running])
-
-  async function fetchIntentions() {
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return
-
-  const { data } = await supabase
-    .from("intentions")
-    .select("*")
-    .eq("user_id", user.id)
-    .order("time", { ascending: true })
-
-  setIntentions(data || [])
-}
-async function deleteIntention(id: string) {
-  await supabase.from("intentions").delete().eq("id", id)
-  fetchIntentions()
-}
 
   async function fetchTasks() {
   try {
@@ -221,32 +202,7 @@ async function deleteIntention(id: string) {
         🎯 Focus Mode
       </h1>
        
-       <div className="bg-yellow-100 dark:bg-yellow-900 p-4 rounded mb-6">
-  <h2 className="font-bold mb-2">📅 Today's Intentions</h2>
 
-  {intentions.length === 0 && (
-    <p className="text-sm opacity-70">No plan yet</p>
-  )}
-
- {intentions.map((i) => (
-  <div key={i.id} className="flex justify-between items-center mb-2 text-sm">
-    
-    <div>
-      ⏰ {i.time} — I will <b>{i.behavior}</b> in {i.location}
-    </div>
-
-    <div className="flex gap-2">
-      <button
-        onClick={() => deleteIntention(i.id)}
-        className="text-red-500"
-      >
-        ❌
-      </button>
-    </div>
-
-  </div>
-))}
-</div>
       {/* ACTIVE TASK */}
       {activeTask && (
         <div className="bg-gray-100 dark:bg-gray-900 p-6 rounded mb-6 text-center">

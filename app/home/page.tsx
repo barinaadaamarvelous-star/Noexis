@@ -179,38 +179,7 @@ export default function Home() {
 
     setLeaders(data || [])
   }
-   async function saveIntention() {
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return
-
-  const { data, error } = await supabase
-    .from("intentions")
-    .insert({
-      user_id: user.id,
-      behavior,
-      time,
-      location,
-      remind_before: remindBefore
-    })
-    .select()
-
-  console.log("RESULT:", data)
-  console.log("ERROR:", error)
-
-  if (error) {
-    alert("❌ Failed to save")
-    return
-  }
-
-  alert(`🔥 Plan locked:
-"I will ${behavior} at ${time} in ${location}"`)
-
-  // optional: reset form (clean UX)
-  setBehavior("")
-  setTime("")
-  setLocation("")
-  setRemindBefore(3)
-}
+   
   async function createTask() {
     if (!title) return
 
@@ -359,59 +328,7 @@ export default function Home() {
 
   <h2 className="font-semibold text-lg mb-4">🎯 Today's Plan</h2>
 
-  <div className="space-y-3 text-sm">
-
-    <div>
-      I will
-      <input
-        value={behavior}
-        onChange={(e) => setBehavior(e.target.value)}
-        className="ml-2 px-2 py-1 rounded bg-gray-100 dark:bg-gray-800"
-        placeholder="run"
-      />
-    </div>
-
-    <div>
-      at
-      <input
-        type="time"
-        value={time}
-        onChange={(e) => setTime(e.target.value)}
-        className="ml-2 px-2 py-1 rounded bg-gray-100 dark:bg-gray-800"
-      />
-    </div>
-
-    <div>
-      in
-      <input
-        value={location}
-        onChange={(e) => setLocation(e.target.value)}
-        className="ml-2 px-2 py-1 rounded bg-gray-100 dark:bg-gray-800"
-        placeholder="the field"
-      />
-    </div>
-
-    <div className="flex items-center gap-2 mt-3">
-      ⏰ Remind me
-      <select
-        value={remindBefore}
-        onChange={(e) => setRemindBefore(Number(e.target.value))}
-        className="px-2 py-1 rounded bg-gray-100 dark:bg-gray-800"
-      >
-        <option value={1}>1 min before</option>
-        <option value={3}>3 min before</option>
-        <option value={5}>5 min before</option>
-      </select>
-    </div>
-
-    <button
-      onClick={saveIntention}
-      className="w-full mt-4 bg-blue-500 text-white py-2 rounded"
-    >
-      Save Intention
-    </button>
-
-  </div>
+  
 </div>
 
         {/* TASKS */}
