@@ -189,9 +189,9 @@ useEffect(() => {
   else if (xp >= 150) newLevel = "Focused"
   else if (xp >= 50) newLevel = "Builder"
 
-  const lastLevel = localStorage.getItem("lastLevel")
+  if (newLevel !== data.level) {
 
- if (newLevel !== data.level && lastLevel !== newLevel) {
+  console.log("LEVEL UP:", data.level, "➡", newLevel)
 
   await supabase
     .from("users")
@@ -201,10 +201,6 @@ useEffect(() => {
   data.level = newLevel
 
   const message = `⚡ ${getIdentityMessage(newLevel)}`
-
-  
-  // ✅ REMEMBER LEVEL (PREVENT REPEAT)
-  localStorage.setItem("lastLevel", newLevel)
 
   // ✅ SOUND
   if (notifications) {
