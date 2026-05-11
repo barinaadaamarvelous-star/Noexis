@@ -162,10 +162,20 @@ export default function TasksPage() {
     }
 
     // 🎯 GIVE XP
-    await supabase.rpc("increment_score", {
-      user_id_input: user.id,
-      points: xp
-    })
+    const { data: xpData, error: xpError } = await supabase.rpc(
+  "increment_score",
+  {
+    user_id_input: user.id,
+    points: xp,
+  }
+)
+
+console.log("XP RESULT:", xpData)
+console.log("XP ERROR:", xpError)
+
+if (xpError) {
+  console.error("❌ XP FAILED:", xpError)
+}
 
     setActiveTask(null)
   }
