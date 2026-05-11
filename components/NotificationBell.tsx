@@ -14,34 +14,55 @@ export default function NotificationBell() {
   const [notifications, setNotifications] = useState<Notification[]>([])
 
   useEffect(() => {
-    fetchNotifications()
+  let channel: any
 
-    // 🔥 realtime updates
-    const channel = supabase
+  async function setup() {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    if (!user) return
+
+    fetchNotifications(user.id)
+
+    channel = supabase
       .channel("notifications")
       .on(
         "postgres_changes",
-        { event: "INSERT", schema: "public", table: "notifications" },
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "notifications",
+          filter: `user_id=eq.${user.id}`,
+        },
         (payload: any) => {
+          console.log("🔔 REALTIME:", payload.new)
+
           setNotifications((prev) => [payload.new, ...prev])
         }
       )
       .subscribe()
+  }
 
-    return () => {
+  setup()
+
+  return () => {
+    if (channel) {
       supabase.removeChannel(channel)
     }
-  }, [])
-
-  async function fetchNotifications() {
-    const { data } = await supabase
-      .from("notifications")
-      .select("*")
-      .order("created_at", { ascending: false })
-      .limit(20)
-
-    setNotifications(data || [])
   }
+}, [])
+
+  async function fetchNotifications(userId: string) {
+  const { data } = await supabase
+    .from("notifications")
+    .select("*")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(20)
+
+  setNotifications(data || [])
+}
 
   return (
     <div className="relative">
