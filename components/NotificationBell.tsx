@@ -14,75 +14,70 @@ export default function NotificationBell() {
   const [notifications, setNotifications] = useState<Notification[]>([])
 
   useEffect(() => {
-  let channel: any
+    let interval: any
 
-  async function setup() {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    async function start() {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
 
-    if (!user) return
+      if (!user) return
 
-    fetchNotifications(user.id)
+      await fetchNotifications(user.id)
 
-    channel = supabase
-      .channel("notifications")
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "notifications",
-          filter: `user_id=eq.${user.id}`,
-        },
-        (payload: any) => {
-          console.log("🔔 REALTIME:", payload.new)
-
-          setNotifications((prev) => [payload.new, ...prev])
-        }
-      )
-      .subscribe()
-  }
-
-  setup()
-
-  return () => {
-    if (channel) {
-      supabase.removeChannel(channel)
+      // 🔥 POLLING FIX
+      interval = setInterval(() => {
+        fetchNotifications(user.id)
+      }, 5000)
     }
-  }
-}, [])
+
+    start()
+
+    return () => {
+      if (interval) clearInterval(interval)
+    }
+  }, [])
 
   async function fetchNotifications(userId: string) {
-  const { data } = await supabase
-    .from("notifications")
-    .select("*")
-    .eq("user_id", userId)
-    .order("created_at", { ascending: false })
-    .limit(20)
+    const { data } = await supabase
+      .from("notifications")
+      .select("*")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(20)
 
-  setNotifications(data || [])
-}
+    setNotifications(data || [])
+  }
 
   return (
     <div className="relative">
 
-      {/* 🔔 Bell Button */}
-      <button onClick={() => setOpen(!open)} className="text-xl">
+      {/* 🔔 Bell */}
+      <button
+        onClick={() => setOpen(!open)}
+        className="relative text-2xl"
+      >
         🔔
+
+        {notifications.length > 0 && (
+          <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full px-1">
+            {notifications.length}
+          </span>
+        )}
       </button>
 
-      {/* 🔴 Dropdown */}
+      {/* 📬 PANEL */}
       {open && (
-        <div className="absolute right-0 mt-2 w-80 bg-white dark:bg-[#1a1a1a] shadow-lg rounded-lg border border-gray-200 dark:border-gray-700 z-50">
+        <div className="absolute right-0 mt-2 w-80 bg-[#1a1a1a] text-white shadow-xl rounded-xl border border-gray-700 z-50">
 
-          <div className="p-3 font-bold border-b border-gray-200 dark:border-gray-700">
+          <div className="p-3 font-bold border-b border-gray-700">
             Notifications
           </div>
 
-          <div className="max-h-80 overflow-y-auto">
+          <div className="max-h-96 overflow-y-auto">
+
             {notifications.length === 0 && (
-              <p className="p-3 text-sm text-gray-500">
+              <p className="p-3 text-gray-400">
                 No notifications yet
               </p>
             )}
@@ -90,7 +85,7 @@ export default function NotificationBell() {
             {notifications.map((n) => (
               <div
                 key={n.id}
-                className="p-3 text-sm hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer"
+                className="p-3 border-b border-gray-800 hover:bg-gray-800"
               >
                 {n.message}
               </div>
