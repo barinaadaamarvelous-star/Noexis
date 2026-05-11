@@ -39,15 +39,54 @@ export default function NotificationBell() {
   }, [])
 
   async function fetchNotifications(userId: string) {
-    const { data } = await supabase
-      .from("notifications")
-      .select("*")
-      .eq("user_id", userId)
-      .order("created_at", { ascending: false })
-      .limit(20)
+  const { data } = await supabase
+    .from("notifications")
+    .select("*")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(20)
 
-    setNotifications(data || [])
+  // 🔥 PLAY SOUND FOR NEW NOTIFICATION
+  if (
+    data &&
+    notifications.length > 0 &&
+    data[0]?.id !== notifications[0]?.id
+  ) {
+    try {
+      const audioCtx = new (window.AudioContext ||
+        (window as any).webkitAudioContext)()
+
+      const oscillator = audioCtx.createOscillator()
+      const gainNode = audioCtx.createGain()
+
+      oscillator.type = "sine"
+      oscillator.frequency.setValueAtTime(
+        880,
+        audioCtx.currentTime
+      )
+
+      gainNode.gain.setValueAtTime(
+        0.1,
+        audioCtx.currentTime
+      )
+
+      gainNode.gain.exponentialRampToValueAtTime(
+        0.0001,
+        audioCtx.currentTime + 0.5
+      )
+
+      oscillator.connect(gainNode)
+      gainNode.connect(audioCtx.destination)
+
+      oscillator.start()
+      oscillator.stop(audioCtx.currentTime + 0.5)
+    } catch (err) {
+      console.log("Sound failed:", err)
+    }
   }
+
+  setNotifications(data || [])
+}
 
   return (
     <div className="relative">
