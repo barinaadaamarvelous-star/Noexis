@@ -1,10 +1,11 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } from "react"
 import { supabase } from "@/lib/supabaseClient"
 import BottomNav from "@/components/BottomNav"
 import AuthGuard from "@/components/AuthGuard"
 import { playSound } from "@/lib/sounds"
+import html2canvas from 'html2canvas'
 
 export default function MyProfile() {
   const [userData, setUserData] = useState<any>(null)
@@ -13,6 +14,7 @@ export default function MyProfile() {
   const [streak, setStreak] = useState(0)
   const [loading, setLoading] = useState(false)
   const [achievements, setAchievements] = useState<any[]>([])
+  const scoreCardRef = useRef<HTMLDivElement>(null)
   const [theme, setTheme] = useState<"light" | "dark">("light")
 
   // NEW STATES
@@ -120,14 +122,45 @@ useEffect(() => {
   }
 
   function getLevelStyle(level: string) {
-    switch (level) {
-      case "Builder": return "bg-blue-100 text-blue-600"
-      case "Focused": return "bg-green-100 text-green-700"
-      case "Relentless": return "bg-red-100 text-red-700"
-      case "Discipline Master": return "bg-purple-100 text-purple-700"
-      default: return "bg-gray-200 text-gray-700"
-    }
+  switch (level) {
+
+    case "Beginner":
+      return `
+        bg-gray-200 text-gray-700 border-gray-300
+        dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700
+      `
+
+    case "Builder":
+      return `
+        bg-blue-100 text-blue-700 border-blue-200
+        dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800
+      `
+
+    case "Focused":
+      return `
+        bg-green-100 text-green-700 border-green-200
+        dark:bg-green-900/30 dark:text-green-300 dark:border-green-800
+      `
+
+    case "Relentless":
+      return `
+        bg-red-100 text-red-700 border-red-200
+        dark:bg-red-900/30 dark:text-red-300 dark:border-red-800
+      `
+
+    case "Discipline Master":
+      return `
+        bg-purple-100 text-purple-700 border-purple-200
+        dark:bg-purple-900/30 dark:text-purple-300 dark:border-purple-800
+      `
+
+    default:
+      return `
+        bg-gray-200 text-gray-700 border-gray-300
+        dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700
+      `
   }
+}
   function getIdentityMessage(level: string) {
   switch (level) {
     case "Builder":
@@ -428,374 +461,582 @@ useEffect(() => {
   const progress = Math.min((xp / maxXP) * 100, 100)
   const league = getLeague(userData.score || 0)
 
+ async function downloadScoreCard() {
+  if (!scoreCardRef.current) return
+
+  const canvas = await html2canvas(scoreCardRef.current)
+
+  const image = canvas.toDataURL("image/png")
+
+  const link = document.createElement("a")
+  link.href = image
+  link.download = "discipline-scorecard.png"
+  link.click()
+}
+
+async function shareScoreCard() {
+  if (!scoreCardRef.current) return
+
+  const canvas = await html2canvas(scoreCardRef.current)
+
+  canvas.toBlob(async (blob) => {
+    if (!blob) return
+
+    const file = new File(
+      [blob],
+      "discipline-scorecard.png",
+      { type: "image/png" }
+    )
+
+    if (navigator.share) {
+      await navigator.share({
+        title: "My Discipline Score",
+        text: `🔥 ${userData.username} is in ${league} League with ${userData.score} points!`,
+        files: [file],
+      })
+    } else {
+      downloadScoreCard()
+    }
+  })
+}
   return (
-    <AuthGuard>
-    <main className="min-h-screen bg-[#f0f2f5] dark:bg-[#18191a] p-6 flex justify-center items-start">
+  <AuthGuard>
+    <main className="min-h-screen bg-[#f5f5f5] dark:bg-black text-black dark:text-white px-4 py-6 flex justify-center">
 
-      <div className="absolute top-4 right-4 flex items-center gap-3">
-        <div className="relative">
-  <button
-    onClick={(e) => {
-      e.stopPropagation()
-      setShowDropdown(!showDropdown)
-    }}
-    className="text-xl relative"
-  >
-    🔔
-  </button>
+      <div className="w-full max-w-md">
 
-  {/* 🔴 BADGE */}
-  {unreadCount > 0 && (
-    <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs px-2 py-0.5 rounded-full animate-pulse">
-      {unreadCount}
-    </span>
-  )}
+        {/* TOP BAR */}
+        <div className="flex items-center justify-between mb-6">
 
-  {/* 🔽 PREMIUM DROPDOWN */}
-  <div
-    onClick={(e) => e.stopPropagation()}
-    className={`absolute right-0 mt-3 w-80 
-      transform transition-all duration-300 ease-out
-      ${showDropdown 
-  ? "opacity-100 scale-100 translate-y-0" 
-  : "opacity-0 scale-95 -translate-y-4 pointer-events-none"}
-      bg-white text-black 
-      dark:bg-[#242526] dark:text-white 
-      border border-gray-200 dark:border-gray-700 
-      rounded-xl shadow-2xl z-50 overflow-hidden`}
-  >
+          <div>
+            <p className="text-xs uppercase tracking-[3px] text-yellow-500">
+              Elite Profile
+            </p>
 
-    {/* HEADER */}
-    <div className="flex justify-between items-center px-4 py-3 border-b border-gray-200 dark:border-gray-700">
-  <h2 className="font-semibold text-lg">Notifications</h2>
-
-  <button
-    onClick={async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-
-      await supabase
-        .from("notifications")
-        .update({ read: true })
-        .eq("user_id", user.id)
-
-      setNotificationsList(prev =>
-        prev.map(n => ({ ...n, read: true }))
-      )
-
-      setUnreadCount(0)
-    }}
-    className="text-xs text-blue-500 hover:underline"
-  >
-    Mark all as read
-  </button>
-</div>
-
-    {/* LIST */}
-    <div className="max-h-80 overflow-y-auto">
-
-  {/* 🟢 NEW */}
-  {notificationsList.filter(n => !n.read).length > 0 && (
-    <>
-      <p className="px-4 py-2 text-xs text-gray-500 dark:text-gray-400">
-        New
-      </p>
-
-      {notificationsList
-        .filter(n => !n.read)
-        .map((n, i) => (
-          <div
-            key={i}
-            onClick={async () => {
-              await supabase
-                .from("notifications")
-                .update({ read: true })
-                .eq("id", n.id)
-
-              setNotificationsList(prev =>
-                prev.map(item =>
-                  item.id === n.id ? { ...item, read: true } : item
-                )
-              )
-            }}
-            className="px-4 py-3 text-sm cursor-pointer
-              bg-blue-100 dark:bg-blue-900
-              hover:bg-blue-200 dark:hover:bg-blue-800
-              transition"
-          >
-            {n.message}
+            <h1 className="text-3xl font-bold">
+              My Profile
+            </h1>
           </div>
-        ))}
-    </>
-  )}
 
-  {/* ⚪ OLD */}
-  {notificationsList.filter(n => n.read).length > 0 && (
-    <>
-      <p className="px-4 py-2 text-xs text-gray-500 dark:text-gray-400">
-        Earlier
-      </p>
+          <div className="flex items-center gap-3">
 
-      {notificationsList
-        .filter(n => n.read)
-        .map((n, i) => (
-          <div
-            key={i}
-            className="px-4 py-3 text-sm cursor-pointer
-              bg-gray-100 dark:bg-[#2a2a2a]
-              hover:bg-gray-200 dark:hover:bg-[#3a3b3c]
-              transition"
-          >
-            {n.message}
+            {/* NOTIFICATION */}
+            <div className="relative">
+
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setShowDropdown(!showDropdown)
+                }}
+                className="relative h-11 w-11 rounded-full
+                bg-white/10 dark:bg-white/5
+                border border-yellow-500/20
+                backdrop-blur-xl
+                flex items-center justify-center"
+              >
+                🔔
+              </button>
+
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs h-5 min-w-[20px] px-1 rounded-full flex items-center justify-center">
+                  {unreadCount}
+                </span>
+              )}
+
+            </div>
+
+            {/* SETTINGS */}
+            <button
+              onClick={() => setOpenSettings(true)}
+              className="h-11 w-11 rounded-full
+              bg-white/10 dark:bg-white/5
+              border border-yellow-500/20
+              backdrop-blur-xl
+              flex items-center justify-center"
+            >
+              ⚙️
+            </button>
+
           </div>
-        ))}
-    </>
-  )}
+        </div>
 
-  {notificationsList.length === 0 && (
-    <p className="p-4 text-sm text-gray-500 text-center">
-      No notifications yet
-    </p>
-  )}
-</div>
-    </div>
-</div>
+        <div
+  ref={scoreCardRef}
+  className="
+    relative overflow-hidden
+    rounded-3xl
+    border border-yellow-500/20
+    bg-gradient-to-br
+    from-[#111]
+    via-[#1a1a1a]
+    to-black
+    text-white
+    shadow-2xl
+    p-6
+  "
+>
 
-  {/* ⚙️ SETTINGS */}
-  <button
-    onClick={(e) => {
-      e.stopPropagation()
-      setOpenSettings(true)
-    }}
-    className="bg-white dark:bg-gray-800 px-3 py-2 rounded-full shadow"
-  >
-    ⚙️
-  </button>
-</div>
+          {/* GOLD GLOW */}
+          <div className="absolute inset-0 opacity-20 bg-[radial-gradient(circle_at_top,_#facc15,_transparent_60%)]" />
 
-      <div className="w-full max-w-md bg-white dark:bg-[#242526] text-black dark:text-white p-6 rounded-xl shadow-md border border-gray-200 dark:border-gray-700">
+          <div className="relative z-10">
 
-        <div className="flex items-center gap-4">
+            {/* PROFILE */}
+            <div className="flex items-center gap-4">
 
-          {/* AVATAR */}
-          <div className="relative">
-            <img
-              key={userData.avatar_url}
-              src={userData.avatar_url || "/default.png"}
-              onClick={(e) => {
-                e.stopPropagation()
-                setShowAvatarMenu(!showAvatarMenu)
-              }}
-              className="w-20 h-20 rounded-full object-cover border-2 border-blue-500 cursor-pointer"
-            />
+              {/* AVATAR */}
+              <div className="relative">
 
-            {showAvatarMenu && (
-             <div
-               onClick={(e) => e.stopPropagation()}
-               className="absolute top-24 left-0 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded shadow w-40 z-50"
-               >
-                <label className="block px-4 py-2 hover:bg-gray-100 cursor-pointer">
-                  Upload Photo
-                  <input
-                    type="file"
-                    className="hidden"
-                    onChange={(e) => {
-                      if (e.target.files?.[0]) uploadAvatar(e.target.files[0])
-                      setShowAvatarMenu(false)
-                    }}
-                  />
-                </label>
+                <img
+                  src={userData.avatar_url || "/default.png"}
+                  className="
+                  w-24 h-24 rounded-full object-cover
+                  border-4 border-yellow-500
+                  shadow-[0_0_25px_rgba(250,204,21,0.4)]
+                  cursor-pointer
+                "
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setShowAvatarMenu(!showAvatarMenu)
+                  }}
+                />
 
-                {userData.avatar_url && (
-                  <button
-                    onClick={() => {
-                      deleteAvatar()
-                      setShowAvatarMenu(false)
-                    }}
-                    className="w-full text-left px-4 py-2 text-red-500 hover:bg-gray-100"
-                  >
-                    Remove Photo
-                  </button>
+                {showAvatarMenu && (
+                  <div className="
+                    absolute top-28 left-0 z-50
+                    w-44 overflow-hidden
+                    rounded-2xl
+                    border border-gray-700
+                    bg-[#111]
+                    shadow-2xl
+                  ">
+
+                    <label className="block px-4 py-3 hover:bg-white/10 cursor-pointer text-sm">
+                      Upload Photo
+
+                      <input
+                        type="file"
+                        className="hidden"
+                        onChange={(e) => {
+                          if (e.target.files?.[0]) {
+                            uploadAvatar(e.target.files[0])
+                          }
+                          setShowAvatarMenu(false)
+                        }}
+                      />
+                    </label>
+
+                    {userData.avatar_url && (
+                      <button
+                        onClick={() => {
+                          deleteAvatar()
+                          setShowAvatarMenu(false)
+                        }}
+                        className="w-full text-left px-4 py-3 text-red-400 hover:bg-white/10 text-sm"
+                      >
+                        Remove Photo
+                      </button>
+                    )}
+
+                  </div>
                 )}
               </div>
-            )}
-          </div>
 
-          {/* USER INFO */}
-          <div>
-            {editingName ? (
-              <input
-                value={username}
-                autoFocus
-                onChange={(e) => setUsername(e.target.value)}
-                onBlur={saveUsername}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") saveUsername()
-                }}
-                className="text-xl font-semibold bg-transparent border-b outline-none"
-              />
-            ) : (
-              <h1
-                className="text-xl font-semibold cursor-pointer"
-                onClick={() => setEditingName(true)}
-              >
-                {userData.username || "User"}
-              </h1>
-            )}
+              {/* USER INFO */}
+              <div className="flex-1">
 
-            <div className="flex gap-2 mt-1">
-              <span className={`px-2 py-1 rounded-full text-sm ${getLeagueStyle(league)}`}>
-                {league} League
-              </span>
+                {editingName ? (
+                  <input
+                    value={username}
+                    autoFocus
+                    onChange={(e) => setUsername(e.target.value)}
+                    onBlur={saveUsername}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") saveUsername()
+                    }}
+                    className="bg-transparent border-b border-yellow-500 text-2xl font-bold outline-none"
+                  />
+                ) : (
+                  <h2
+                    onClick={() => setEditingName(true)}
+                    className="text-2xl font-bold cursor-pointer"
+                  >
+                    {userData.username}
+                  </h2>
+                )}
 
-              <span className={`px-2 py-1 rounded-full text-sm ${getLevelStyle(level)}`}>
-                {level}
-              </span>
+                <div className="flex gap-2 mt-3 flex-wrap">
+
+                  <span className="
+                    px-3 py-1 rounded-full text-xs font-semibold
+                    bg-yellow-500/10 text-yellow-400
+                    border border-yellow-500/20
+                  ">
+                    {league} League
+                  </span>
+
+                  <span
+  className={`
+    px-3 py-1 rounded-full text-xs font-semibold border
+    ${getLevelStyle(level)}
+  `}
+>
+  {level}
+</span>
+
+                </div>
+
+              </div>
+
             </div>
+
+            {/* STATS */}
+            <div className="grid grid-cols-3 gap-3 mt-8">
+
+              <div className="
+                rounded-2xl p-4
+                bg-white/5 border border-white/10
+                text-center
+              ">
+                <p className="text-2xl font-bold text-yellow-400">
+                  {userData.score || 0}
+                </p>
+
+                <p className="text-xs text-gray-400 mt-1">
+                  SCORE
+                </p>
+              </div>
+
+              <div className="
+                rounded-2xl p-4
+                bg-white/5 border border-white/10
+                text-center
+              ">
+                <p className="text-2xl font-bold text-orange-400">
+                  🔥 {streak}
+                </p>
+
+                <p className="text-xs text-gray-400 mt-1">
+                  STREAK
+                </p>
+              </div>
+
+              <div className="
+                rounded-2xl p-4
+                bg-white/5 border border-white/10
+                text-center
+              ">
+                <p className="text-lg font-bold text-cyan-400">
+                  {xp}
+                </p>
+
+                <p className="text-xs text-gray-400 mt-1">
+                  XP
+                </p>
+              </div>
+
+            </div>
+
+            {/* XP BAR */}
+            <div className="mt-8">
+
+              <div className="flex justify-between text-sm mb-2">
+                <span className="text-gray-400">
+                  Progress
+                </span>
+
+                <span className="text-yellow-400 font-semibold">
+                  {xp}/{maxXP} XP
+                </span>
+              </div>
+
+              <div className="h-3 rounded-full bg-white/10 overflow-hidden">
+
+                <div
+                  className="
+                    h-full rounded-full
+                    bg-gradient-to-r from-yellow-400 to-yellow-600
+                  "
+                  style={{ width: `${progress}%` }}
+                />
+
+              </div>
+
+            </div>
+
           </div>
         </div>
+        <div className="grid grid-cols-2 gap-3 mt-4">
 
-        {/* STATS */}
-        <div className="mt-6 grid grid-cols-3 text-center">
-          <div>
-            <p className="font-bold">{userData.score || 0}</p>
-            <p className="text-sm">Score</p>
-          </div>
+  <button
+    onClick={shareScoreCard}
+    className="
+      py-3 rounded-2xl
+      bg-yellow-500 text-black
+      font-bold
+    "
+  >
+    Share Scorecard
+  </button>
 
-          <div>
-            <p className="font-bold text-orange-500">🔥 {streak}</p>
-            <p className="text-sm">Streak</p>
-          </div>
+  <button
+    onClick={downloadScoreCard}
+    className="
+      py-3 rounded-2xl
+      bg-white/10 border border-white/10
+      text-white font-bold
+    "
+  >
+    Download
+  </button>
 
-          <div>
-            <p className="font-bold">{level}</p>
-            <p className="text-sm">Identity</p>
-          </div>
-        </div>
-
-        {/* PROGRESS */}
-        <div className="mt-6">
-          <div className="flex justify-between text-sm">
-            <span>Progress</span>
-            <span>{xp}/{maxXP} XP</span>
-          </div>
-
-          <div className="w-full bg-gray-300 h-2 rounded mt-1">
-            <div
-              className="bg-blue-600 h-2 rounded"
-              style={{ width: `${progress}%` }}
-            />
-          </div>
-        </div>
+</div>
 
         {/* ACHIEVEMENTS */}
         <div className="mt-6">
-          <h2 className="font-bold mb-2">Achievements</h2>
 
-          {achievements.map((a, i) => (
-            <div key={i}className="bg-white dark:bg-[#3a3b3c] p-3 rounded mb-2 shadow">
-              <p className="font-semibold">{a.achievements.title}</p>
-              <p className="text-sm text-gray-500">
-                {a.achievements.description}
-              </p>
-            </div>
-          ))}
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-bold">
+              Achievements
+            </h2>
+
+            <span className="text-sm text-gray-500">
+              {achievements.length} unlocked
+            </span>
+          </div>
+
+          <div className="space-y-3">
+
+            {achievements.map((a, i) => (
+              <div
+                key={i}
+                className="
+                  rounded-2xl p-4
+                  bg-white dark:bg-[#111]
+                  border border-gray-200 dark:border-gray-800
+                  shadow-sm
+                "
+              >
+                <p className="font-semibold">
+                  {a.achievements.title}
+                </p>
+
+                <p className="text-sm text-gray-500 mt-1">
+                  {a.achievements.description}
+                </p>
+              </div>
+            ))}
+
+          </div>
+
         </div>
 
-        {loading && <p className="text-sm mt-2">Uploading...</p>}
       </div>
-      
+
+      {/* NOTIFICATION DROPDOWN */}
+      {showDropdown && (
+        <div
+          onClick={(e) => e.stopPropagation()}
+          className="
+            fixed top-20 right-4 z-50
+            w-[90%] max-w-sm
+            rounded-3xl overflow-hidden
+            border border-gray-700
+            bg-[#111]
+            text-white
+            shadow-2xl
+          "
+        >
+
+          <div className="p-4 border-b border-gray-800 flex items-center justify-between">
+            <h2 className="font-bold">
+              Notifications
+            </h2>
+
+            <button
+              onClick={markNotificationsRead}
+              className="text-xs text-yellow-400"
+            >
+              Mark all read
+            </button>
+          </div>
+
+          <div className="max-h-[400px] overflow-y-auto">
+
+           {notificationsList.map((n, i) => (
+  <div
+    key={i}
+    onClick={async () => {
+      if (!n.read) {
+        await supabase
+          .from("notifications")
+          .update({ read: true })
+          .eq("id", n.id)
+
+        setNotificationsList(prev =>
+          prev.map(item =>
+            item.id === n.id
+              ? { ...item, read: true }
+              : item
+          )
+        )
+
+        setUnreadCount(prev => Math.max(prev - 1, 0))
+      }
+    }}
+    className={`
+      px-4 py-4 text-sm
+      border-b border-gray-800
+      transition cursor-pointer
+
+      ${
+        n.read
+          ? "bg-[#111] text-gray-400 hover:bg-[#181818]"
+          : "bg-yellow-500/10 text-white hover:bg-yellow-500/20 border-l-4 border-yellow-400"
+      }
+    `}
+  >
+
+    <div className="flex items-start justify-between gap-3">
+
+      <p className="leading-relaxed">
+        {n.message}
+      </p>
+
+      {!n.read && (
+        <span className="mt-1 h-2 w-2 rounded-full bg-yellow-400 shrink-0" />
+      )}
+
+    </div>
+
+  </div>
+))}
+          </div>
+
+        </div>
+      )}
+
       {/* SETTINGS PANEL */}
       {openSettings && (
-  <>
-    {/* BACKDROP */}
-    <div
-      className="fixed inset-0 bg-black/40 z-40"
-      onClick={() => setOpenSettings(false)}
-    />
-
-    {/* SLIDE PANEL */}
-      <div className={`
-       fixed top-0 right-0 h-full w-[85%] max-w-sm 
-       bg-white dark:bg-[#242526] text-black dark:text-white z-50 shadow-xl
-       transform transition-transform duration-300
-       ${openSettings ? "translate-x-0" : "translate-x-full"}
-     `}>
-      <div className="p-6">
-
-        {/* HEADER */}
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-xl font-bold">Settings</h2>
-          <button onClick={() => setOpenSettings(false)}>✕</button>
-        </div>
-
-        {/* DARK MODE */}
-        <div className="flex justify-between items-center mb-5">
-          <span className="flex items-center gap-2">
-            {theme === "dark" ? "🌙" : "☀️"} Appearance
-          </span>
-
-          <button
-            onClick={toggleTheme}
-            className="bg-gray-200 dark:bg-gray-700 px-4 py-1 rounded-full"
-          >
-            {theme === "dark" ? "Dark" : "Light"}
-          </button>
-        </div>
-
-        {/* NOTIFICATIONS */}
-        <div className="flex justify-between items-center mb-5">
-          <span>🔔 Notifications</span>
-          <input
-            type="checkbox"
-            checked={notifications}
-            onChange={async () => {
-              const newValue = !notifications
-              setNotifications(newValue)
-
-              const { data: { user } } = await supabase.auth.getUser()
-              if (!user) return
-
-              await supabase
-                .from("users")
-                .update({ notifications: newValue })
-                .eq("id", user.id)
-            }}
+        <>
+          <div
+            className="fixed inset-0 bg-black/60 z-40"
+            onClick={() => setOpenSettings(false)}
           />
-        </div>
-        {/* 🔊 SOUND VOLUME (ADD THIS HERE) */}
-<div className="flex justify-between items-center mb-5">
-  <span>🔊 Sound Volume</span>
 
-  <input
-    type="range"
-    min="0"
-    max="1"
-    step="0.05"
-    value={volume}
-    onChange={(e) => setVolume(Number(e.target.value))}
-    className="w-32"
-  />
-</div>
+          <div className="
+            fixed top-0 right-0 z-50
+            h-full w-[90%] max-w-sm
+            bg-[#0b0b0b]
+            text-white
+            border-l border-yellow-500/20
+            p-6
+            overflow-y-auto
+          ">
 
-        {/* LOGOUT */}
-        <button
-          onClick={async () => {
-            await supabase.auth.signOut()
-            window.location.href = "/login"
-          }}
-          className="w-full bg-red-500 text-white py-2 rounded mt-10"
-        >
-          Logout
-        </button>
+            <div className="flex items-center justify-between mb-8">
+              <h2 className="text-2xl font-bold">
+                Settings
+              </h2>
 
-      </div>
-      
-    </div>
-  </>
-  )}
-  <BottomNav />
+              <button onClick={() => setOpenSettings(false)}>
+                ✕
+              </button>
+            </div>
+
+            {/* THEME */}
+            <div className="mb-6">
+
+              <p className="text-sm text-gray-400 mb-2">
+                Appearance
+              </p>
+
+              <button
+                onClick={toggleTheme}
+                className="
+                  w-full rounded-2xl p-4
+                  bg-white/5 border border-white/10
+                  text-left
+                "
+              >
+                {theme === "dark" ? "🌙 Dark Mode" : "☀️ Light Mode"}
+              </button>
+
+            </div>
+
+            {/* NOTIFICATIONS */}
+            <div className="mb-6">
+
+              <div className="flex items-center justify-between">
+
+                <span>Notifications</span>
+
+                <input
+                  type="checkbox"
+                  checked={notifications}
+                  onChange={async () => {
+                    const newValue = !notifications
+                    setNotifications(newValue)
+
+                    const { data: { user } } =
+                      await supabase.auth.getUser()
+
+                    if (!user) return
+
+                    await supabase
+                      .from("users")
+                      .update({ notifications: newValue })
+                      .eq("id", user.id)
+                  }}
+                />
+
+              </div>
+
+            </div>
+
+            {/* VOLUME */}
+            <div className="mb-8">
+
+              <p className="mb-3">
+                Sound Volume
+              </p>
+
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.05"
+                value={volume}
+                onChange={(e) =>
+                  setVolume(Number(e.target.value))
+                }
+                className="w-full"
+              />
+
+            </div>
+
+            {/* LOGOUT */}
+            <button
+              onClick={async () => {
+                await supabase.auth.signOut()
+                window.location.href = "/login"
+              }}
+              className="
+                w-full rounded-2xl py-4
+                bg-red-500 hover:bg-red-600
+                font-semibold transition
+              "
+            >
+              Logout
+            </button>
+
+          </div>
+        </>
+      )}
+
+      <BottomNav />
+
     </main>
-    </AuthGuard>
-  )
+  </AuthGuard>
+)
 }

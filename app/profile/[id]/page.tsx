@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { supabase } from "@/lib/supabaseClient"
 import { useParams } from "next/navigation"
+import AuthGuard from "@/components/AuthGuard"
 
 export default function PublicProfile() {
 
@@ -57,60 +58,159 @@ export default function PublicProfile() {
   const league = getLeague(userData.score || 0)
 
   return (
-    <main className="min-h-screen bg-white flex justify-center p-6">
+  <AuthGuard>
+  <main className="
+    min-h-screen
+    bg-[#f5f5f5] dark:bg-black
+    text-black dark:text-white
+    flex justify-center
+    px-4 py-8
+  ">
 
-      <div className="w-full max-w-md bg-gray-100 p-6 rounded-xl shadow-md">
+    <div className="w-full max-w-md">
 
-        {/* HEADER */}
-        <div className="flex items-center gap-4">
+      {/* HEADER */}
+      <div className="mb-6">
 
-          <img
-            src={userData.avatar_url || "/default.png"}
-            className="w-20 h-20 rounded-full object-cover border"
-          />
+        <p className="text-xs uppercase tracking-[3px] text-yellow-500 mb-2">
+          Public Profile
+        </p>
 
-          <div>
-            <h1 className="text-xl font-semibold">
-              {userData.username}
-            </h1>
+        <h1 className="text-3xl font-bold">
+          {userData.username}
+        </h1>
 
-            <div className="flex gap-2 mt-1">
+      </div>
 
-              <span className="px-2 py-1 bg-yellow-200 text-yellow-800 rounded text-sm">
-                {league} League
-              </span>
+      {/* MAIN CARD */}
+      <div className="
+        relative overflow-hidden
+        rounded-3xl
+        border border-gray-200 dark:border-yellow-500/20
+        bg-white dark:bg-[#0d0d0d]
+        shadow-xl
+      ">
 
-              <span className="px-2 py-1 bg-blue-200 text-blue-800 rounded text-sm">
-                {userData.level}
-              </span>
+        {/* GOLD GLOW */}
+        <div className="
+          absolute inset-0 opacity-20
+          bg-[radial-gradient(circle_at_top,_#facc15,_transparent_60%)]
+          dark:block hidden
+        " />
+
+        <div className="relative z-10 p-6">
+
+          {/* PROFILE */}
+          <div className="flex items-center gap-4">
+
+            <img
+              src={userData.avatar_url || "/default.png"}
+              className="
+                w-24 h-24 rounded-full object-cover
+                border-4 border-yellow-500
+                shadow-[0_0_25px_rgba(250,204,21,0.35)]
+              "
+            />
+
+            <div className="flex-1">
+
+              <h2 className="text-2xl font-bold">
+                {userData.username}
+              </h2>
+
+              <div className="flex flex-wrap gap-2 mt-3">
+
+                {/* LEAGUE */}
+                <span className="
+                  px-3 py-1 rounded-full
+                  text-xs font-semibold
+                  bg-yellow-100 text-yellow-700
+                  dark:bg-yellow-500/10 dark:text-yellow-400
+                  border border-yellow-200 dark:border-yellow-500/20
+                ">
+                  {league} League
+                </span>
+
+                {/* LEVEL */}
+                <span className="
+                  px-3 py-1 rounded-full
+                  text-xs font-semibold
+                  bg-blue-100 text-blue-700
+                  dark:bg-white/10 dark:text-white
+                  border border-blue-200 dark:border-white/10
+                ">
+                  {userData.level}
+                </span>
+
+              </div>
 
             </div>
+
           </div>
 
-        </div>
+          {/* STATS */}
+          <div className="grid grid-cols-3 gap-3 mt-8">
 
-        {/* STATS */}
-        <div className="grid grid-cols-3 gap-4 mt-6 text-center">
+            {/* SCORE */}
+            <div className="
+              rounded-2xl p-4 text-center
+              bg-gray-100 dark:bg-white/5
+              border border-gray-200 dark:border-white/10
+            ">
 
-          <div>
-            <p className="font-bold text-lg">{userData.score}</p>
-            <p className="text-sm text-gray-600">Score</p>
-          </div>
+              <p className="text-2xl font-bold text-yellow-500 dark:text-yellow-400">
+                {userData.score || 0}
+              </p>
 
-          <div>
-            <p className="font-bold text-lg">{userData.streak}</p>
-            <p className="text-sm text-gray-600">Streak</p>
-          </div>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 tracking-wide">
+                SCORE
+              </p>
 
-          <div>
-            <p className="font-bold text-lg">{userData.level}</p>
-            <p className="text-sm text-gray-600">Identity</p>
+            </div>
+
+            {/* STREAK */}
+            <div className="
+              rounded-2xl p-4 text-center
+              bg-gray-100 dark:bg-white/5
+              border border-gray-200 dark:border-white/10
+            ">
+
+              <p className="text-2xl font-bold text-orange-500">
+                🔥 {userData.streak || 0}
+              </p>
+
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 tracking-wide">
+                STREAK
+              </p>
+
+            </div>
+
+            {/* IDENTITY */}
+            <div className="
+              rounded-2xl p-4 text-center
+              bg-gray-100 dark:bg-white/5
+              border border-gray-200 dark:border-white/10
+            ">
+
+              <p className="text-lg font-bold text-cyan-600 dark:text-cyan-400">
+                {userData.level}
+              </p>
+
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 tracking-wide">
+                IDENTITY
+              </p>
+
+            </div>
+
           </div>
 
         </div>
 
       </div>
 
-    </main>
-  )
+    </div>
+
+  </main>
+  </AuthGuard>
+)
 }

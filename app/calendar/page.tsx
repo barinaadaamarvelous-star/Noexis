@@ -1,4 +1,4 @@
-"use client";
+ "use client";
 
 import React from "react";
 import { supabase } from "@/lib/supabaseClient";
@@ -122,6 +122,62 @@ export default function CalendarPage() {
       );
     }
   };
+  React.useEffect(() => {
+  if (!user) return;
+
+  const channel = supabase
+    .channel("task_logs_live")
+    .on(
+      "postgres_changes",
+      {
+        event: "INSERT",
+        schema: "public",
+        table: "task_logs",
+      },
+      async (payload) => {
+
+        const newLog = payload.new as any;
+
+        // only current user
+        if (newLog.user_id !== user.id) return;
+
+        // refetch instantly
+        const { data } = await supabase
+          .from("task_logs")
+          .select("completed_at")
+          .eq("user_id", user.id);
+
+        const grouped: Record<string, number> = {};
+
+        data?.forEach((item: any) => {
+          const date = format(
+            new Date(item.completed_at),
+            "yyyy-MM-dd"
+          );
+
+          if (!grouped[date]) grouped[date] = 0;
+
+          grouped[date]++;
+        });
+
+        const formattedData = Object.keys(grouped).map((date) => ({
+          date,
+          value: grouped[date],
+        }));
+
+        formattedData.sort((a, b) =>
+          a.date.localeCompare(b.date)
+        );
+
+        setActivityData(formattedData);
+      }
+    )
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}, [user]);
   if (loading) {
   return (
     <main className="min-h-screen p-6 bg-white dark:bg-[#020617]">
@@ -138,197 +194,276 @@ export default function CalendarPage() {
   );
   }
   return (
-    <AuthGuard>
-    <div className="min-h-screen p-6 bg-white dark:bg-[#020617] text-black dark:text-white">
-      <h1 style={styles.title}>📊 Discipline Analytics</h1>
+  <AuthGuard>
+    <main className="
+      min-h-screen
+      bg-[#f5f5f5] dark:bg-black
+      text-black dark:text-white
+      px-4 py-6 pb-24
+      flex justify-center
+    ">
 
-      {/* CHART */}
-      <div className="bg-gray-100 dark:bg-[#0f172a] p-5 rounded-xl mb-8">
-        <h2 style={styles.cardTitle}>Activity</h2>
+      <div className="w-full max-w-md">
 
-        <ResponsiveContainer width="100%" height={250}>
-          <LineChart data={activityData}>
-            <XAxis
-              dataKey="date"
-              stroke="#aaa"
-              tickFormatter={(value) =>
-                format(new Date(value), "MMM d")
-              }
-            />
-            <YAxis stroke="#aaa" />
-            <Tooltip
-              labelFormatter={(value) =>
-                format(new Date(value), "MMM d, yyyy")
-              }
-            />
-            <Line
-              type="monotone"
-              dataKey="value"
-              stroke="#22c55e"
-              strokeWidth={3}
-              dot={{ r: 5 }}
-            />
-          </LineChart>
-        </ResponsiveContainer>
-      </div>
-
-      {/* CALENDAR */}
-      <div
-        style={styles.card}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
-      >
         {/* HEADER */}
-        <div style={styles.header}>
-          <button
-            className="bg-gray-200 dark:bg-[#1e293b] text-black dark:text-white px-3 py-2 rounded-lg"
-            onClick={() =>
-              setCurrentDate(
-                new Date(
-                  currentDate.getFullYear(),
-                  currentDate.getMonth() - 1,
-                  1
-                )
-              )
-            }
-          >
-            ←
-          </button>
+        <div className="mb-8">
 
-          <h2 style={styles.cardTitle}>
-            {format(currentDate, "MMMM yyyy")}
-          </h2>
+          <p className="text-xs uppercase tracking-[3px] text-yellow-500 mb-2">
+            Analytics
+          </p>
 
-          <button
-            style={styles.navBtn}
-            onClick={() =>
-              setCurrentDate(
-                new Date(
-                  currentDate.getFullYear(),
-                  currentDate.getMonth() + 1,
-                  1
-                )
-              )
-            }
-          >
-            →
-          </button>
+          <h1 className="text-3xl font-bold">
+            Discipline Calendar
+          </h1>
+
         </div>
 
-        {/* WEEK DAYS */}
-        <div className="grid grid-cols-7 mb-2 text-gray-500 dark:text-gray-400">
-          {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
-            <div key={d} style={styles.weekDay}>
-              {d}
+        {/* ACTIVITY CHART */}
+        <div className="
+          rounded-3xl
+          border border-gray-200 dark:border-yellow-500/10
+          bg-white dark:bg-[#0d0d0d]
+          shadow-xl
+          p-5 mb-6
+        ">
+
+          <div className="flex items-center justify-between mb-5">
+
+            <div>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Activity
+              </p>
+
+              <h2 className="text-xl font-bold">
+                Focus Sessions
+              </h2>
             </div>
-          ))}
+
+            <div className="
+              px-3 py-1 rounded-full text-xs
+              bg-green-100 text-green-700
+              dark:bg-green-500/10 dark:text-green-400
+              border border-green-200 dark:border-green-500/20
+            ">
+              Live
+            </div>
+
+          </div>
+
+          <ResponsiveContainer width="100%" height={240}>
+            <LineChart data={activityData}>
+
+              <XAxis
+                dataKey="date"
+                stroke="#737373"
+                tickFormatter={(value) =>
+                  format(new Date(value), "MMM d")
+                }
+              />
+
+              <YAxis stroke="#737373" />
+
+              <Tooltip
+                contentStyle={{
+                  background: "#111",
+                  border: "1px solid #333",
+                  borderRadius: "14px",
+                  color: "white",
+                }}
+                labelFormatter={(value) =>
+                  format(new Date(value), "MMM d, yyyy")
+                }
+              />
+
+              <Line
+                type="monotone"
+                dataKey="value"
+                stroke="#eab308"
+                strokeWidth={3}
+                dot={{
+                  r: 4,
+                  strokeWidth: 2,
+                }}
+              />
+
+            </LineChart>
+          </ResponsiveContainer>
+
         </div>
 
-        {/* GRID */}
-        <div className="grid grid-cols-7 gap-2">
-          {Array.from({ length: startDayIndex }).map((_, i) => (
-            <div key={i} />
-          ))}
+        {/* CALENDAR */}
+        <div
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+          className="
+            rounded-3xl
+            border border-gray-200 dark:border-white/10
+            bg-white dark:bg-[#0d0d0d]
+            shadow-xl
+            p-5
+          "
+        >
 
-          {days.map((day) => {
-            const formattedDay = format(day, "yyyy-MM-dd");
+          {/* MONTH HEADER */}
+          <div className="flex items-center justify-between mb-6">
 
-            const activity = activityData.find(
-              (item) => item.date === formattedDay
-            );
+            <button
+              onClick={() =>
+                setCurrentDate(
+                  new Date(
+                    currentDate.getFullYear(),
+                    currentDate.getMonth() - 1,
+                    1
+                  )
+                )
+              }
+              className="
+                w-10 h-10 rounded-full
+                bg-gray-100 dark:bg-white/5
+                border border-gray-200 dark:border-white/10
+                hover:scale-105 transition
+              "
+            >
+              ←
+            </button>
 
-            const hasActivity = activity && activity.value > 0;
+            <div className="text-center">
 
-            const isToday =
-              format(day, "yyyy-MM-dd") ===
-              format(today, "yyyy-MM-dd");
+              <p className="text-xs uppercase tracking-[2px] text-gray-500 dark:text-gray-400">
+                Monthly Overview
+              </p>
 
-            return (
-              <div
-                key={formattedDay}
-                 className={`
-               h-14 rounded-lg flex items-center justify-center font-medium cursor-pointer transition
-              ${hasActivity 
-                  ? "bg-green-600 text-white" 
-                  : "bg-gray-200 dark:bg-[#1e293b] text-black dark:text-white"}
-               ${isToday ? "border-2 border-green-500" : ""}
-               `}
-              >
-                {format(day, "d")}
+              <h2 className="text-xl font-bold mt-1">
+                {format(currentDate, "MMMM yyyy")}
+              </h2>
+
+            </div>
+
+            <button
+              onClick={() =>
+                setCurrentDate(
+                  new Date(
+                    currentDate.getFullYear(),
+                    currentDate.getMonth() + 1,
+                    1
+                  )
+                )
+              }
+              className="
+                w-10 h-10 rounded-full
+                bg-gray-100 dark:bg-white/5
+                border border-gray-200 dark:border-white/10
+                hover:scale-105 transition
+              "
+            >
+              →
+            </button>
+
+          </div>
+
+          {/* WEEK DAYS */}
+          <div className="
+            grid grid-cols-7
+            mb-3
+            text-center
+            text-xs
+            uppercase tracking-wide
+            text-gray-500 dark:text-gray-400
+          ">
+            {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
+              <div key={d}>
+                {d}
               </div>
-            );
-          })}
+            ))}
+          </div>
+
+          {/* DAYS */}
+          <div className="grid grid-cols-7 gap-2">
+
+            {Array.from({ length: startDayIndex }).map((_, i) => (
+              <div key={i} />
+            ))}
+
+            {days.map((day) => {
+
+              const formattedDay = format(day, "yyyy-MM-dd")
+
+              const activity = activityData.find(
+                (item) => item.date === formattedDay
+              )
+
+              const hasActivity = activity && activity.value > 0
+
+              const isToday =
+                format(day, "yyyy-MM-dd") ===
+                format(today, "yyyy-MM-dd")
+
+              return (
+                <div
+                  key={formattedDay}
+                  className={`
+                    aspect-square
+                    rounded-2xl
+                    flex items-center justify-center
+                    text-sm font-semibold
+                    transition-all duration-200
+                    border
+
+                    ${
+                      hasActivity
+                        ? `
+                          bg-yellow-500
+                          text-black
+                          border-yellow-400
+                          shadow-[0_0_18px_rgba(234,179,8,0.35)]
+                        `
+                        : `
+                          bg-gray-100
+                          dark:bg-white/5
+                          border-gray-200
+                          dark:border-white/10
+                          text-black
+                          dark:text-white
+                        `
+                    }
+
+                    ${
+                      isToday
+                        ? "ring-2 ring-cyan-400 scale-105"
+                        : ""
+                    }
+                  `}
+                >
+
+                  <div className="relative">
+
+                    {format(day, "d")}
+
+                    {hasActivity && (
+                      <span className="
+                        absolute -bottom-2 left-1/2
+                        -translate-x-1/2
+                        w-1.5 h-1.5
+                        rounded-full
+                        bg-black
+                      " />
+                    )}
+
+                  </div>
+
+                </div>
+              )
+            })}
+
+          </div>
+
         </div>
+
       </div>
+
       <BottomNav />
-    </div>
-    </AuthGuard>
-  );
+    </main>
+  </AuthGuard>
+)
 }
-
-
-// ✅ STYLES
-const styles: { [key: string]: React.CSSProperties } = {
-  page: {
-    background: "#020617",
-    minHeight: "100vh",
-    padding: "30px",
-    color: "white",
-  },
-  title: {
-    fontSize: "28px",
-    fontWeight: "bold",
-    marginBottom: "20px",
-  },
-  card: {
-    background: "#0f172a",
-    padding: "20px",
-    borderRadius: "12px",
-    marginBottom: "30px",
-    touchAction: "pan-y",
-  },
-  header: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: "15px",
-  },
-  navBtn: {
-    background: "#1e293b",
-    border: "none",
-    color: "white",
-    padding: "8px 12px",
-    borderRadius: "8px",
-    cursor: "pointer",
-    fontSize: "16px",
-  },
-  cardTitle: {
-    fontSize: "18px",
-    fontWeight: "600",
-  },
-  weekRow: {
-    display: "grid",
-    gridTemplateColumns: "repeat(7, 1fr)",
-    marginBottom: "10px",
-    color: "#94a3b8",
-  },
-  weekDay: {
-    textAlign: "center",
-    fontSize: "14px",
-  },
-  grid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(7, 1fr)",
-    gap: "10px",
-  },
-  day: {
-    height: "60px",
-    borderRadius: "8px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    fontWeight: "500",
-    cursor: "pointer",
-  },
-};
